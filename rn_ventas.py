@@ -51,44 +51,49 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # -----------------------------
-# Modelo mejorado
+# Modelo (con cache 🔥)
 # -----------------------------
-model = Sequential([
-    Input(shape=(3,)),
-    Dense(32, activation="relu"),
-    Dropout(0.2),
-    Dense(16, activation="relu"),
-    Dropout(0.2),
-    Dense(1)
-])
+@st.cache_resource
+def entrenar_modelo(X_train, y_train, X_test, y_test):
 
-model.compile(
-    optimizer=Adam(learning_rate=0.001),
-    loss="mse"
-)
+    model = Sequential([
+        Input(shape=(3,)),
+        Dense(32, activation="relu"),
+        Dropout(0.2),
+        Dense(16, activation="relu"),
+        Dropout(0.2),
+        Dense(1)
+    ])
 
-# Early stopping
-early_stop = EarlyStopping(
-    monitor="val_loss",
-    patience=20,
-    restore_best_weights=True
-)
+    model.compile(
+        optimizer=Adam(learning_rate=0.001),
+        loss="mse"
+    )
 
-# Entrenamiento
-history = model.fit(
-    X_train, y_train,
-    epochs=300,
-    validation_data=(X_test, y_test),
-    callbacks=[early_stop],
-    verbose=0
-)
+    early_stop = EarlyStopping(
+        monitor="val_loss",
+        patience=20,
+        restore_best_weights=True
+    )
+
+    history = model.fit(
+        X_train, y_train,
+        epochs=300,
+        validation_data=(X_test, y_test),
+        callbacks=[early_stop],
+        verbose=0
+    )
+
+    return model, history
+
+model, history = entrenar_modelo(X_train, y_train, X_test, y_test)
 
 st.success("Modelo entrenado")
 
 # -----------------------------
 # Evaluación
 # -----------------------------
-y_pred = model.predict(X_test)
+y_pred = model.predict(X_test, verbose=0)
 
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
@@ -119,5 +124,5 @@ clasificador = st.selectbox("Clasificador", [0,1,2])
 nuevo = np.array([[lluvia, temperatura, clasificador]])
 nuevo_scaled = scaler.transform(nuevo)
 
-pred = model.predict(nuevo_scaled)
+pred = model.predict(nuevo_scaled, verbose=0)
 st.write(f"Ventas estimadas: {pred[0][0]:.2f}")
