@@ -5,106 +5,110 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping
+# -----------------------------
+# Configuración
+# -----------------------------
+st.set_page_config(page_title="Predicción de Ventas (MLP)", layout="centered")
+st.title("📈 Predicción de Ventas con Red Neuronal (scikit-learn)")
 
-# Configuración de la página
-st.set_page_config(page_title="Predicción de Ventas con RN", layout="centered")
+# -----------------------------
+# Datos
+# -----------------------------
+data = {
+    "lluvia": [0.7,13.2,0.1,9,33.5,105,145.6,235.1,159.6,45.5,14.6,3,
+           12.3,11.7,8.4,2.5,64.6,211.6,131.4,173.7,196.7,71,1.6,8.7],
 
-st.title("📊 Predicción de Ventas con Red Neuronal")
+    "temperatura": [16.4,17.4,20.3,21,23.6,27.5,19.2,19.4,19.3,16.9,17.4,15.5,
+           15.9,17.5,19.8,20.2,21.6,19.2,18.7,19,19.3,17.9,16.3,15.5],
 
-# Cargar archivo
-archivo = st.file_uploader("Sube tu archivo CSV", type=["csv"])
+    "clasificador": [2,2,1,0,0,0,2,2,1,0,1,0,
+           2,2,1,0,0,0,2,2,1,0,1,0],
 
-if archivo is not None:
-    df = pd.read_csv(archivo)
+    "ventas": [10240,11197,7014,11620,15239,9549,6619,12156,3796,
+              4435.5,4409,2731,7738.7,7167,1441.65,8285.48,4097,
+              9721.5,6579.42,8502,3796,2494,279,3322.43]
+}
 
-    st.subheader("Vista previa de datos")
-    st.write(df.head())
+df = pd.DataFrame(data)
 
-    # Selección de variables
-    columnas = df.columns.tolist()
-    target = st.selectbox("Selecciona la variable objetivo (Y)", columnas)
-    features = st.multiselect("Selecciona variables predictoras (X)", [c for c in columnas if c != target])
+st.subheader("📋 Datos")
+st.write(df)
 
-    if len(features) > 0:
-        X = df[features].values
-        y = df[target].values
+# -----------------------------
+# Variables
+# -----------------------------
+X = df[["lluvia", "temperatura", "clasificador"]]
+y = df["ventas"]
 
-        # División de datos
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# -----------------------------
+# División
+# -----------------------------
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Escalamiento
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
+# -----------------------------
+# Escalamiento
+# -----------------------------
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-        # Modelo
-        model = Sequential([
-            Dense(16, activation="relu", input_shape=(X_train_scaled.shape[1],)),
-            Dropout(0.2),
-            Dense(8, activation="relu"),
-            Dense(1)
-        ])
+# -----------------------------
+# Modelo MLP
+# -----------------------------
+model = MLPRegressor(
+    hidden_layer_sizes=(16, 8),
+    activation='relu',
+    solver='adam',
+    max_iter=5000,
+    random_state=42
+)
 
-        model.compile(optimizer=Adam(learning_rate=0.001), loss="mse")
+# -----------------------------
+# Entrenamiento
+# -----------------------------
+if st.button("Entrenar modelo"):
+    model.fit(X_train_scaled, y_train)
 
-        # Entrenamiento
-        if st.button("Entrenar modelo"):
-            early_stop = EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
+    # Predicción
+    y_pred = model.predict(X_test_scaled)
 
-            history = model.fit(
-                X_train_scaled, y_train,
-                validation_split=0.2,
-                epochs=200,
-                batch_size=16,
-                verbose=0,
-                callbacks=[early_stop]
-            )
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
 
-            st.success("Modelo entrenado correctamente ✅")
+    st.success("Modelo entrenado correctamente ✅")
+    st.write(f"MSE: {mse:.2f}")
+    st.write(f"R²: {r2:.4f}")
 
-            # Evaluación
-            y_pred = model.predict(X_test_scaled)
+    # Gráfica
+    fig, ax = plt.subplots()
+    ax.scatter(y_test, y_pred)
+    ax.set_xlabel("Valores reales")
+    ax.set_ylabel("Predicciones")
+    ax.set_title("Real vs Predicción")
+    st.pyplot(fig)
 
-            mse = mean_squared_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
+    # Guardar en sesión
+    st.session_state["model"] = model
+    st.session_state["scaler"] = scaler
 
-            st.write(f"MSE: {mse:.4f}")
-            st.write(f"R²: {r2:.4f}")
+# -----------------------------
+# Predicción manual
+# -----------------------------
+if "model" in st.session_state:
 
-            # Gráfica
-            fig, ax = plt.subplots()
-            ax.scatter(y_test, y_pred)
-            ax.set_xlabel("Valores reales")
-            ax.set_ylabel("Predicciones")
-            ax.set_title("Real vs Predicción")
-            st.pyplot(fig)
+    st.subheader("🔮 Nueva predicción")
 
-            # Guardar en sesión
-            st.session_state["model"] = model
-            st.session_state["scaler"] = scaler
-            st.session_state["features"] = features
+    lluvia = st.number_input("Lluvia", value=10.0)
+    temperatura = st.number_input("Temperatura", value=20.0)
+    clasificador = st.selectbox("Clasificador", [0,1,2])
 
-        # Predicción manual
-        if "model" in st.session_state:
-            st.subheader("🔮 Nueva predicción")
+    if st.button("Predecir"):
+        entrada = np.array([[lluvia, temperatura, clasificador]])
+        entrada_scaled = st.session_state["scaler"].transform(entrada)
 
-            entrada = []
-            for col in st.session_state["features"]:
-                val = st.number_input(f"Ingrese {col}", value=0.0)
-                entrada.append(val)
+        pred = st.session_state["model"].predict(entrada_scaled)
 
-            if st.button("Predecir"):
-                entrada = np.array(entrada).reshape(1, -1)
-                entrada_scaled = st.session_state["scaler"].transform(entrada)
-
-                pred = st.session_state["model"].predict(entrada_scaled)
-                st.success(f"Predicción: {pred[0][0]:.4f}")
-
-else:
-    st.info("Por favor, sube un archivo CSV para comenzar.")
+        st.success(f"Ventas estimadas: {pred[0]:.2f}")
